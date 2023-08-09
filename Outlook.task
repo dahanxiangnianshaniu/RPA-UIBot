@@ -1,0 +1,187 @@
+/**
+	目录：
+	MailOutlook(strEmailSend,strEmailTo,strEmailACC,strTitle,strContent,strAttAchment)	//Outlook发送邮件
+	openOutlook()	//打开outlook
+	emailFilterAndDownloadAttachments(senderEmailAddress,attchmentSavePath)	//获取邮件列表，筛选邮件主题并下载附件
+
+ */
+/*
+功能：Outlook发送邮件
+参数：
+strEmailSend：发件账号
+strEmailTo：收件人
+strEmailACC：抄送
+strTitle：主题
+strContent：内容（以HTML格式编写正文内容，无需考虑签名）
+strAttAchment：附件
+
+注：多个收件人、抄送人请用英文;拼接（最后无需加;）
+    获取commander的邮件签名自行调整对应部门
+*/
+/*
+Dim bRet = ""
+Dim strMailSatate = ""
+strEmailSend = ""
+strEmailTo= "sera04@siriopharma.com"
+strEmailACC=""
+strTitle="Q018发送邮件测试"
+strContent="test"
+strAttAchment=[]
+MailOutlook(strEmailSend,strEmailTo,strEmailACC,strTitle,strContent,strAttAchment)
+*/
+Function MailOutlook(strEmailSend,strEmailTo,strEmailACC,strTitle,strContent,strAttAchment)
+	Dim strMessage ="使用Outlook发送邮件"
+	//module_log.Module_Log("Module_MailOutlook","Info",strMessage)
+	Dim isSuccess = False
+    Dim strAutograph = ""
+	
+	//获取commander邮件签名
+	
+	Dim iRet = InStr($ub.version["Product"],"Enterprise",1,False)
+	If iRet > 0
+		strAutograph = Asset.GetAsset("strMailSignatureR0005")
+	Else
+		// strAutograph = AssetEx.GetAsset("strMailSignatureR0005")
+	End If
+	//html格式正文框架
+	strContent = ''' <!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <title>Title</title> </head> <body>''' & strContent & strAutograph &'''</body </html>'''
+	// & '''<br/>================================<br/>此邮件为RPA发送 ，请勿回复此邮件<br/>Sent by RPA , Please do not reply to this email</body </html>'''
+	
+	Dim arrEmailTo = Split(strEmailTo,";")
+	Dim arrEmailACC = Split(strEmailACC,";")
+	Dim arrAttAchment = Split(strAttAchment,";")
+	
+	strEmailSend ="sera04@siriopharma.com"
+	// TracePrint(strEmailSend)
+	bRet = Outlook.SendMail(strEmailSend,arrEmailTo,strTitle,strContent,"html",arrAttAchment,arrEmailACC,"")
+	TracePrint($PrevResult)
+	
+	If bRet = True
+		strMessage ="使用Outlook发送邮件成功"
+		//module_log.Module_Log("Module_MailOutlook","Info",strMessage)
+		isSuccess = True
+	Else
+		strMessage ="使用Outlook发送邮件失败"
+		//module_log.Module_Log("Module_MailOutlook","ERROR",strMessage)
+	End If
+	
+	Return isSuccess 
+End Function
+
+
+Function openOutlook()
+	Dim bOutlookOpen, bRet, strMessage
+    Dim iPID
+	// 获取进程状态
+	bOutlookOpen=App.GetStatus("outlook.exe")
+	// 运行图标状态，注意Office版本
+	#icon("@res:o8e77bae-v3hd-5ebl-08om-p366tftm4lgj.png")
+	bRet = UiElement.Exists({"wnd":[{"app":"explorer","cls":"Shell_TrayWnd"},{"cls":"ReBarWindow32"},{"cls":"MSTaskSwWClass","title":"运行中的应用程序","aaname":"运行中的应用程序"},{"cls":"MSTaskListWClass","title":"运行中的应用程序","aaname":"运行中的应用程序"}],"ctrl":[{"role":"ROLE_SYSTEM_TOOLBAR","name":"运行中的应用程序"},{"role":"ROLE_SYSTEM_PUSHBUTTON","aid":"Microsoft.Office.OUTLOOK.EXE.15","name":"Outlook*","idx":1}]},{"bContinueOnError":False,"iDelayAfter":300,"iDelayBefore":200})
+	
+	If bRet =False And bOutlookOpen =True
+		App.Kill("outlook.exe")        
+	End If
+	
+	If bOutlookOpen = False
+		// 读配置表路径
+		iPID = App.Run('''C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE''', "0", "1")
+		For i = 0 To 10
+			bOutlookOpen=App.GetStatus("outlook.exe") 
+			bRet = UiElement.Exists({"wnd":[{"app":"explorer","cls":"Shell_TrayWnd"},{"cls":"ReBarWindow32"},{"cls":"MSTaskSwWClass","title":"运行中的应用程序","aaname":"运行中的应用程序"},{"cls":"MSTaskListWClass","title":"运行中的应用程序","aaname":"运行中的应用程序"}],"ctrl":[{"role":"ROLE_SYSTEM_TOOLBAR","name":"运行中的应用程序"},{"role":"ROLE_SYSTEM_PUSHBUTTON","aid":"Microsoft.Office.OUTLOOK.EXE.15","name":"Outlook*","idx":1}]},{"bContinueOnError":False,"iDelayAfter":300,"iDelayBefore":200})
+			If bOutlookOpen = True And bRet = True
+				strMessage ="成功打开outlook"
+				TracePrint strMessage
+				Dialog.Notify(strMessage)
+				Break
+			Else
+				strMessage = "Outlook加载中，等待5s"
+				TracePrint strMessage
+				Dialog.Notify(strMessage)
+				Delay 5000
+			End If
+		Next
+	End If
+End Function
+
+
+Function closeOutlook()
+	// 
+End Function
+
+
+
+//功能点：获取邮件列表，筛选邮件主题并下载附件
+Function emailFilterAndDownloadAttachments(senderEmailAddress,attchmentSavePath)
+	Log.Info("开始下载体系文件")
+	Dim filePath
+	Dim emailList
+    Dim emailArr = []
+    Dim processName = ''
+
+	//判断OutLook邮箱状态,如果未打开就启动
+    If App.GetStatus("OutLook.exe")=False
+        App.Start("OutLook.exe")
+        Delay(3000)
+    End If
+
+    Dialog.Notify("查找符合条件的邮件", "监听邮件", 1)
+	Try
+        //筛选并获取所有包含半成品关键字的邮件:sera04@siriopharma.com
+        emailList = Outlook.GetMailMessages(senderEmailAddress,"收件箱","Q017打印样品标签流程",False,False,1)
+		//Log.Info("sera04@siriopharma.com")
+        //emailList = Outlook.GetMailMessages("sera04@siriopharma.com","收件箱","",False,False,10)
+		
+        //TracePrint(emailList)
+    Catch
+        emailList=[]
+    End Try
+
+  
+    
+    If Len(emailList)<>0
+        //过滤不符合的邮件,筛选存在关键字DMS的邮件，其他邮件不做处理
+        For Each el In emailList
+            TracePrint el
+            If Regex.FindStr(el["SUBJECT"],"紧急")<>""
+                push(emailArr,el)
+                processName = el["SUBJECT"]
+				
+            End If
+        Next
+    End If
+
+    
+
+    Dialog.Notify("查找符合的Excel附件并下载", "监听邮件", 1)
+    TracePrint attchmentSavePath
+    //没有符合的邮件,则流程结束
+    If Len(emailArr)=0
+        TracePrint("没有符合的邮件。")
+    Else
+        For i=0 To UBound(emailArr)
+            For Each att In emailArr[i]["ATTACHMENTS"]
+                //TracePrint attchmentSavePath&"\\"&att["FILENAME"]
+                //根据文件后缀下载附件，不符合的不处理
+                
+                If EndsWith(att["FILENAME"],".xlsx")=True Or EndsWith(att["FILENAME"],".xls")=True 
+                    bRet = File.FileExists(attchmentSavePath&"\\"&att["FILENAME"])
+                    If bRet=True
+                        File.DeleteFile(attchmentSavePath&"\\"&att["FILENAME"])
+                    End If
+                    //下载附件
+                    filePath=Outlook.DownloadAttachments(emailArr[i],attchmentSavePath)
+                    
+                    //将这封邮件移至其他邮箱文件夹中
+                    Outlook.MoveMessage(senderEmailAddress,"Q017-打印样品标签" ,emailArr[i] )
+                    Break
+                End If
+                
+            Next
+        Next
+        
+    End If
+    
+    Log.Info("下载体系文件结束")
+    TracePrint processName
+    Return processName
+End Function

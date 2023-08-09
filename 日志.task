@@ -1,0 +1,45 @@
+/**
+	目录：
+	Module_Log(strTaskName,strLogType,strLogContent)		//写入日志
+	
+
+ */
+
+
+/*
+功能：写入日志
+传参：
+strTaskName:流程块名
+strLogType：日志类型(Info/Error/Warn)
+strLogContent:日志内容
+*/
+
+Function Module_Log(strTaskName,strLogType,strLogContent)
+	//获取调用时间
+	Dim runTime = Time.Format(Time.Now(),"mm/dd/yyyy hh:mm:ss")
+	
+	//获取流程执行日期，用于匹配对应日志文件
+	Dim nowTime=Time.Now()
+	Dim LogTime = Time.DateAdd("s",-CInt($Flow.ElaspedTime/1000),nowTime)
+	Dim LogDate = Time.Format(LogTime,"yyyymmdd")
+	
+	//将写入内容存在临时字符中
+	Dim strContent = runTime & "," &  strTaskName & "," & strLogType & "," & strLogContent &"\n"
+	
+	//在对应日志文件中追加内容
+	If strLogType = "Info"
+		Log.Info(strLogContent)
+		Dialog.Notify(strLogContent, "UiBot", "0")
+		File.Append(@res"Data\\Log\\流程运行日志"&LogDate&".csv",strContent,"gbk")
+	Else 
+		If strLogType = "Warn"
+			Log.Warn(strLogContent)
+            Dialog.Notify(strLogContent, "UiBot", "0")
+			File.Append(@res"Data\\Log\\流程错误日志"&LogDate&".csv",strContent,"gbk")
+		Else
+			Log.Error(strLogContent)
+			Dialog.Notify(strLogContent, "UiBot", "0")
+            File.Append(@res"Data\\Log\\流程错误日志"&LogDate&".csv",strContent,"gbk")
+		End If
+	End If
+End Function
