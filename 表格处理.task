@@ -1,0 +1,375 @@
+/*
+    目录：
+    writeToTabulsCond(...)                  //将Excel_A的数据复制到Excel_B（要求A、B表结构相同）
+    getPosTableHead(objExcelWorkBook, sheet, tablehead, flag)   //按照表头获取所在的列字母或位置
+    filterData(dataList, headList, filterKey, filterValue)      //将二维数组中的元素转为字典，并筛选数据
+    writeFormula(objExcelWorkBook, sheet, localizer, insertColumn, formula, insNumber, n)   //在指定位置插入列，并逐一填充数据
+    saveFile(filePath)      //对已打开的Excel对象进行另存为的操作
+ */
+
+
+/**
+
+    功能点：将Excel_A的数据复制到Excel_B（要求A、B表结构相同）
+
+    参数：
+        objExcelWorkBook_A:
+        sheet_A:        默认为0
+        objExcelWorkBook_B:
+        sheet_B:        默认为0
+        filterCond:     筛选Excel_A列的值是否符合条件。
+                        数据格式为 列名:值
+                        如果是空则代表不做筛选
+        verifyColumn:   校验Excel_A列的值是否已在Excel_B表中存在。
+                        数据格式为 列名
+                        如果是空则代表不做检查
+        dataSorting:    Excel_A的数据需要分拣到Excel_B的多个页签
+                        数据格式为 列名
+                        如果是空则代表不做分拣
+
+    步骤：
+        1.获取Excel_B的最后一条数据位置
+        2.当filterCond、verifyColumn、dataSorting都为空时，代表读取数据区域写入，不包含表头。
+        3.当filterCond、verifyColumn、dataSorting存在不为空时，代表遍历每一行数据后写入
+            1）获取Excel_A表filterCond、verifyColumn、dataSorting列的位置、行数
+            2）遍历Excel_A的每一行数据
+            3）获取Excel_A该行filterCond、verifyColumn、dataSorting列的值
+            4）判断filterCond是否符合条件
+            5）判断verifyColumn是否存在重复
+            6）判断dataSorting在Excel_B中是否存在页签
+            7）写入数据
+            
+ */
+/*
+objExcelWorkBook_A = Excel.BindBook("1.xlsx")
+sheet_A = ""
+objExcelWorkBook_B = Excel.BindBook("Q018接检工作管理-配置表清单测试用.xlsx")
+sheet_B = "Sheet1"
+filterCond=""
+dataSorting=""
+verifyColumn=""
+Excel.ClearRange(objExcelWorkBook_B,"Sheet1","A2:H10",true,true)
+writeToTabulsCond(objExcelWorkBook_A,sheet_A,objExcelWorkBook_B,sheet_B,filterCond,verifyColumn,dataSorting)
+*/
+Function writeToTabulsCond(objExcelWorkBook_A,sheet_A,objExcelWorkBook_B,sheet_B,filterCond,verifyColumn,dataSorting) 
+    Rem 初始化
+    Dim arrRet,filterColumn,filterValue
+    Dim i_PosFilterColumn,i_PosVerifyColumn,i_PosDataSorting
+    Dim list_columnData_B
+    //处理数据
+    If filterCond <> "" 
+        //将filterCond拆分成列名和值
+        arrRet = Split(filterCond,":")
+        filterColumn = arrRet[0]    // 列名
+        filterValue = arrRet[1]     // 列值
+        i_PosFilterColumn = getPosTableHead(objExcelWorkBook_A, sheet_A, filterColumn, 1)   // 列名位置 [行数,列数]
+    End If
+    If verifyColumn <> "" 
+        i_PosVerifyColumn = getPosTableHead(objExcelWorkBook_A, sheet_A, verifyColumn, 1)   // 列名位置 [行数,列数]
+    End If
+    If dataSorting <> "" 
+        i_PosDataSorting = getPosTableHead(objExcelWorkBook_A, sheet_A, dataSorting, 1)   // 列名位置 [行数,列数]
+    End If
+    // 默认为0
+    If Trim(sheet_A, "") = "" 
+        sheet_A = 0
+    End If
+    If Trim(sheet_B, "") = "" 
+        sheet_B = 0
+    End If
+
+    Rem 获取参数
+    Dim i_RowCount_A,i_RowCount_B
+    Dim arrayRet
+    i_RowCount_A = Excel.GetRowsCount(objExcelWorkBook_A,sheet_A)
+
+    Rem 读取数据区域写入，不包含表头
+    If filterCond = "" And verifyColumn = "" And dataSorting = ""
+        // 读取Excel_A的数据，不包含表头
+        arrayRet = Excel.ReadRange(objExcelWorkBook_A,sheet_A,"A2",true)
+
+        //写入Excel_B的最后
+        i_RowCount_B = Excel.GetRowsCount(objExcelWorkBook_B,sheet_B)
+        Excel.WriteRange(objExcelWorkBook_B,sheet_B,[i_RowCount_B + 1,1],arrayRet,true)
+        //结束方法的调用
+        Return 
+    End If
+
+    Dim list_rowData_A,ValueInRow
+    Rem 遍历每一行数据
+    For i = 2 To i_RowCount_A step 1
+        // 读取Excel_A的行数据
+        list_rowData_A = Excel.ReadRow(objExcelWorkBook_A,sheet_A,"A" & CStr(i),false)
+        // 判断filterCond是否符合条件
+        If filterCond <> ""  
+            // 访问数组元素是从0开始，此处需要坐标 - 1
+            ValueInRow = list_rowData_A[i_PosFilterColumn[1] - 1]
+            // 行数据不符合筛选条件，跳过该行数据的处理
+            If ValueInRow <> filterValue
+                Continue
+            End If
+        End If
+        
+        // 当 dataSorting 不为空时，将Excel_B页签改为dataSorting列上的值
+        If dataSorting <> "" 
+            ValueInRow = list_rowData_A[i_PosDataSorting[1] - 1]
+            // 检查Excel_B是否存在 ValueInRow 这个页签
+            sheetRet = Excel.GetSheetsName(objExcelWorkBook_B)
+            flag = False
+            For Each value In sheetRet
+                // 如果存在一样的情况，则存在可以写入的页签
+                If ValueInRow = value
+                    flag = True
+                    sheet_B = ValueInRow
+                    Break
+                End If
+            Next
+            If flag = False 
+                Continue
+            End If
+        End If
+
+        // 判断verifyColumn的值是否存在重复
+        If verifyColumn <> "" 
+            // 读取Excel_B 在i_PosVerifyColumn 上的列值到列表中
+            // Excel.MergeRange(objExcelWorkBook_B,sheet_B,"A1",false,false)
+            list_columnData_B = Excel.ReadColumn(objExcelWorkBook_B,sheet_B,i_PosVerifyColumn,true)
+    
+            ValueInRow = list_rowData_A[i_PosVerifyColumn[1] - 1]
+            // 检查ValueInRow是否在list_columnData_B里，如果存在则表示重复
+            flag = True    //设置默认为能写入数据
+            For Each value In list_columnData_B
+                // 如果存在一样的情况，则不能写入数据
+                If ValueInRow = value
+                    flag = False     // 更改状态为不能写入数据
+                    Break
+                End If
+            Next
+            If flag = False 
+                Continue
+            End If
+        End If
+        
+        // 将行数据追加写入到Excel_B的sheet_B的最后
+        i_RowCount_B = Excel.GetRowsCount(objExcelWorkBook_B,sheet_B)
+        Excel.WriteRow(objExcelWorkBook_B,sheet_B,"A" & CStr(i_RowCount_B + 1),list_rowData_A,True)
+
+    Next
+    
+    return True
+End Function
+
+
+
+
+
+/*
+
+    功能：按照表头获取所在的列字母或位置
+
+    objExcelWorkBook：excel文件对象
+    sheet： 页签。当sheet为空时默认为第一张页签
+    tablehead： 表头名字
+    flag：返回值的格式。当flag为空时默认为0，为0时返回表头所在列的字母，为1时返回表头所在单元格位置的列表格式
+
+*/
+
+// objExcelWorkBook = Excel.OpenExcel('''C:\Users\rpadmin.TSIRIO\Desktop\1.xlsx''',true,"Excel","","")
+// sheet = ""
+// tablehead = "表头22"
+// flag = 1
+// s = getPosTableHead(objExcelWorkBook, sheet, tablehead, flag)
+// TracePrint($PrevResult)
+// Excel.CloseExcel(objExcelWorkBook,true)
+Function getPosTableHead(objExcelWorkBook, sheet, tablehead, flag) 
+    Dim objRet,ret,formatRet
+    If trim(sheet,"") = "" 
+        sheet = 0
+    End If
+    If trim(flag,"") = "" 
+        flag = 0
+    End If
+    If flag = 0 
+        formatRet = False
+    ElseIf flag = 1
+        formatRet = True
+    End If
+    objRet = Excel.Find(objExcelWorkBook, sheet, "A1", tablehead, formatRet, false)
+    If flag = 0 
+        ret = LetterFromStr(objRet)
+    Else
+        ret = objRet
+    End If
+    Return ret
+End Function
+
+
+
+
+
+
+/*
+    功能点：将二维数组中的元素转为字典，并筛选数据
+
+
+*/
+
+/* 
+dataList = [["8100", "感官检验岗", "林伟鹏", "02867", "谢旋", "05144", "汕头检验中心", ""], ["8100", "理化检验岗", "刘佳宇", "05137", "孙冰琳", "05165", "汕头检验中心", ""], ["8100", "液相检验岗", "朱晓彤", "03978", "杜鑫", "05402", "汕头检验中心", ""], ["8100", "光谱检验岗", "吴琳", "04692", "李琳", "03607", "汕头检验中心", ""], ["8100", "微生物检验岗", "徐扬", "02689", "张畅", "04787", "汕头检验中心", ""], ["8200", "理化检验岗", "杨圆", "81510", "黄敏", "80265", "马鞍山检验中心", ""], ["8100", "仪器检验岗", "吴环宇", "80136", "林伟鹏", "02867", "马鞍山检验中心", ""], ["8100", "微生物检验岗", "黄敏", "80265", "谢旋", "05144", "马鞍山检验中心", ""]]
+headList = ["工厂", "检验岗位", "备选人员1", "域账号", "备选人员2", "域账号", "站点", "密码"]
+filterKey = "站点"
+filterValue = "汕头检验中心"
+filterData(dataList, headList, filterKey, filterValue)
+*/
+Function filterData(dataList, headList, filterKey, filterValue)
+	Dim arrayData
+	Dim data, head
+	Dim arrRet = []
+	Dim arrayRet = []
+	//将二维数组的元素转为字典
+	For Each data In dataList
+		arrayData = {}
+		//检查是否为空
+		If Trim(data[0]) = ""
+			Continue
+		End If
+		For Each key, head In headList
+			arrayData[head] = data[key]
+		Next 
+		arrRet = push(arrRet, arrayData)
+	Next 
+
+	If Trim(filterKey, "") <> ""
+		//筛选条件
+		For Each value In arrRet
+			//TracePrint value
+			If value[filterKey] = filterValue
+				arrayRet = push(arrayRet, value)
+			End If
+		Next 
+	End If
+
+
+	TracePrint arrayRet
+	return arrayRet
+End Function
+
+
+
+
+/*
+    功能点：在指定位置插入列，并逐一填充数据
+
+    objExcelWorkBook: 打开的文件对象
+    sheet:     操作的页签，为""时默认第一个页签
+    localizer：定位的位置，插入列的位置是该列名的上一列
+    insertColumn：插入列名，为""，则不加列名
+    formula：填充的数值，可为公式，涉及行数用[i]代替,i代表是当前行
+    insNumber： 检查第n列序号的开关，0为关闭，1为开启。默认为0
+    n:  第n列
+
+*/
+/* 
+//举个例子
+f = ''''''
+objExcelWorkBook = Excel.OpenExcel(f,true,"Excel","","")
+sheet = 0
+localizer = "特殊调整项"
+insertColumn = "年金调整数"
+formula = "=IF(L[i]>1214.4,1214.4,L[i])"
+insNumber = 1
+writeFormula(objExcelWorkBook, sheet, localizer, insertColumn, formula, insNumber) 
+insertColumn = "实际合计"
+formula = "=I[i]+O[i]"
+writeFormula(objExcelWorkBook, sheet, localizer, insertColumn, formula, insNumber)
+Excel.CloseExcel(objExcelWorkBook,true)
+*/
+Function writeFormula(objExcelWorkBook, sheet, localizer, insertColumn, formula, insNumber, n) 
+    Dim objRet,iRet,tableHeadOfRow
+    Dim rowRet,serNumber,sRet
+    
+    If sheet = "" 
+        sheet = 0
+    End If
+    If insNumber = "" 
+        insNumber = 0
+    End If
+
+    //获取定位器所在的行
+    objRet = Excel.Find(objExcelWorkBook,sheet,"A1",localizer,true,false)
+    iRet = UBound(objRet)
+    If iRet = -1 
+        Log.Error("未找到"&localizer&"所在的位置，请检查表格")
+        Exit
+    Else 
+        //找到所在的位置，单独获取行数作为表头所在行数
+        tableHeadOfRow = objRet[0]
+        //插入列在定位的下一列
+        objRet[1] = objRet[1]
+    End If
+
+    //插入列
+    Excel.InsertColumn(objExcelWorkBook,sheet,objRet,[insertColumn],True)
+
+    //判断是否需要填充列
+    If formula = ""
+        Return 
+    End If
+
+    //遍历列，填充数据
+    /*
+        1. 获取行数
+        2. 遍历列
+            2.1 是否开启第n列序号的检查
+            2.2 公式替换
+            2.3 填充数据
+    */
+
+    //获取行数
+    rowRet = Excel.GetRowsCount(objExcelWorkBook,sheet)
+
+    //遍历列，进行数据的填充
+    For i = tableHeadOfRow + 1 To rowRet step 1
+        //根据insNumber检查第一列的序号，在开启的情况下，会自动跳过没有序号的数据行
+        If insNumber = 1 
+            //读取序号列的值
+            serNumber = Excel.ReadCell(objExcelWorkBook,sheet,[i, n],true)
+            If Not IsNumeric(serNumber) Or serNumber = ""
+                Continue
+            End If
+        End If
+
+        //对序号已经做了检查，此处对填充的值进行公式处理
+        sRet = Replace(formula,"[i]",CStr(i),false)
+
+        //写入数据
+        Excel.WriteCell(objExcelWorkBook,sheet,[i, objRet[1]],sRet,false)
+    Next
+
+End Function
+
+
+
+
+/**
+        功能点：对已打开的Excel对象进行另存为的操作
+
+        filePath：保存路径
+ */
+Function saveFile(filePath) 
+    //文件另存为
+	Dim objRet = {}
+	objRet["文件"] = {"wnd": [{"cls": "XLMAIN", "title": "* - Excel", "app": "EXCEL"}, {"cls": "EXCEL*", "idx": 1}, {"cls": "MsoCommandBar", "title": "Ribbon"}, {"cls": "MsoWorkPane", "title": "Ribbon", "aaname": "Ribbon"}, {"cls": "NUIPane"}, {"cls": "NetUIHWND", "aaname": "Ribbon"}], "ctrl": [{"role": "ROLE_SYSTEM_PROPERTYPAGE", "name": "Ribbon"}, {"role": "ROLE_SYSTEM_PUSHBUTTON", "name": "“文件”选项卡"}]}
+	objRet["另存为"] = {"wnd": [{"cls": "XLMAIN", "title": "* - Excel", "app": "EXCEL"}, {"cls": "FullpageUIHost"}, {"cls": "NetUIHWND"}], "ctrl": [{"role": "ROLE_SYSTEM_LIST", "name": "文件"}, {"role": "ROLE_SYSTEM_LISTITEM", "name": "另存为"}]}
+	objRet["浏览"] = {"wnd": [{"cls": "XLMAIN", "title": "* - Excel", "app": "EXCEL"}, {"cls": "FullpageUIHost"}, {"cls": "NetUIHWND"}], "ctrl": [{"role": "ROLE_SYSTEM_PANE", "name": "Backstage 视图"}, {"role": "ROLE_SYSTEM_PANE", "name": "另存为"}, {"role": "ROLE_SYSTEM_GROUPING", "name": "保存功能"}, {"role": "ROLE_SYSTEM_MENUBAR", "name": "保存功能"}, {"role": "ROLE_SYSTEM_PUSHBUTTON", "name": "浏览"}]}
+	objRet["文件名"] = {"wnd": [{"cls": "#32770", "title": "另存为", "app": "EXCEL"}, {"cls": "DUIViewWndClassName"}, {"cls": "DirectUIHWND", "aaname": "浏览器窗格"}, {"cls": "FloatNotifySink"}, {"cls": "ComboBox", "aaname": "文件名:"}, {"cls": "Edit", "aaname": "文件名:", "ctrlid": 1001}]}
+	objRet["保存"] = {"wnd": [{"cls": "#32770", "title": "另存为", "app": "EXCEL"}, {"cls": "Button", "title": "保存(&S)", "aaname": "保存(S)", "ctrlid": 1}]}
+	
+    Mouse.Action(objRet["文件"], "left", "click", 10000, {"bContinueOnError": false, "iDelayAfter": 300, "iDelayBefore": 200, "bSetForeground": true, "sCursorPosition": "Center", "iCursorOffsetX": 0, "iCursorOffsetY": 0, "sKeyModifiers": [], "sSimulate": "simulate", "bMoveSmoothly": false})
+	Mouse.Action(objRet["另存为"], "left", "click", 10000, {"bContinueOnError": false, "iDelayAfter": 300, "iDelayBefore": 200, "bSetForeground": true, "sCursorPosition": "Center", "iCursorOffsetX": 0, "iCursorOffsetY": 0, "sKeyModifiers": [], "sSimulate": "simulate", "bMoveSmoothly": false})
+	Mouse.Action(objRet["浏览"], "left", "click", 10000, {"bContinueOnError": false, "iDelayAfter": 300, "iDelayBefore": 200, "bSetForeground": true, "sCursorPosition": "Center", "iCursorOffsetX": 0, "iCursorOffsetY": 0, "sKeyModifiers": [], "sSimulate": "simulate", "bMoveSmoothly": false})
+	Keyboard.InputText(objRet["文件名"], filePath, true, 20, 10000, {"bContinueOnError": false, "iDelayAfter": 300, "iDelayBefore": 500, "bSetForeground": true, "sSimulate": "message", "bValidate": false, "bClickBeforeInput": false})
+	Mouse.Action(objRet["保存"], "left", "click", 10000, {"bContinueOnError": false, "iDelayAfter": 300, "iDelayBefore": 200, "bSetForeground": true, "sCursorPosition": "Center", "iCursorOffsetX": 0, "iCursorOffsetY": 0, "sKeyModifiers": [], "sSimulate": "simulate", "bMoveSmoothly": false})
+
+End Function
+	

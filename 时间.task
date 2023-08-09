@@ -1,0 +1,265 @@
+/*
+    目录：
+    betweenDate2(beginTime,endTime,inTime)  // 判断 inTime时间是否在给定的时间段内
+    betweenDate(beginTime,endTime)      //判断当前时间是否在给定的时间段内
+    difiTimeNUnit(compareTime,comparedTime,targetNumber,unit)   //判断两个时间是否相差n个Time单位（时分秒）
+    difiDataNUnit(compareTime,comparedTime,targetNumber,unit)   //判断两个时间是否相差n个Data单位（年月日）
+    
+ */
+
+/*
+    功能点：判断当前时间是否在给定的时间段内
+    参数：
+        beginTime：时间格式
+        endTime：时间格式
+        inTime: 检查的时间，时间格式
+    返回值：True/False
+*/
+/*
+beginTime = "2023/7/23 1:00:00"
+//beginTime = Time.TimeSerial(1, 0, 0)
+TracePrint beginTime
+endTime = "2023/7/13 13:30:00"
+//endTime = Time.TimeSerial(16, 0, 0)
+TracePrint($PrevResult)
+//判断当前时间是否在时间段内
+ret = betweenDate(beginTime,endTime)
+TracePrint($PrevResult)
+*/
+Function betweenDate2(beginTime,endTime,inTime)
+	Dim flag = False
+    Dim tRet,iReth,iRetm,iRets,dTime,beginTime_between,endTime_between,endTimes,beginTimes
+
+    //判断结束时间是否为空，是则设置endTime = "2000-1-1 23:59:59"
+    If Trim(endTime, "") = '' 
+        endTime = "2000-1-1 23:59:59"
+    End If
+
+    //处理当前时间
+    tRet = Time.CDate(inTime)
+	iReth = Time.Hour(tRet)
+	iRetm = Time.Minute(tRet)
+	iRets = Time.Second(tRet)
+	dTime = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //处理开始时间
+    beginTimes = Time.CDate(beginTime)
+    iReth = Time.Hour(beginTimes)
+	iRetm = Time.Minute(beginTimes)
+	iRets = Time.Second(beginTimes)
+	beginTime_between = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //处理结束时间
+    endTimes = Time.CDate(endTime)
+    iReth = Time.Hour(endTimes)
+	iRetm = Time.Minute(endTimes)
+	iRets = Time.Second(endTimes)
+	endTime_between = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //TracePrint Time.DateDiff("s", dTime, beginTime_between)
+    //TracePrint Time.DateDiff("s", dTime, endTime_between)
+
+	if Time.DateDiff("s", dTime, beginTime_between) <= 0 And Time.DateDiff("s", dTime, endTime_between) >= 0
+        flag = True
+	End If
+    Return flag
+End Function
+/*
+    功能点：判断当前时间是否在给定的时间段内
+    参数：
+        beginTime：时间格式
+        endTime：时间格式
+    返回值：True/False
+*/
+/*
+beginTime = "2023/7/23 1:00:00"
+//beginTime = Time.TimeSerial(1, 0, 0)
+TracePrint beginTime
+endTime = "2023/7/13 13:30:00"
+//endTime = Time.TimeSerial(16, 0, 0)
+TracePrint($PrevResult)
+//判断当前时间是否在时间段内
+ret = betweenDate(beginTime,endTime)
+TracePrint($PrevResult)
+*/
+Function betweenDate(beginTime,endTime)
+	Dim flag = False
+    Dim tRet,iReth,iRetm,iRets,dTime,beginTime_between,endTime_between,endTimes,beginTimes
+
+    //判断结束时间是否为空，是则设置endTime = "2000-1-1 23:59:59"
+    If Trim(endTime, "") = '' 
+        endTime = "2000-1-1 23:59:59"
+    End If
+
+    //处理当前时间
+    tRet = Time.Now()
+	iReth = Time.Hour(tRet)
+	iRetm = Time.Minute(tRet)
+	iRets = Time.Second(tRet)
+	dTime = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //处理开始时间
+    beginTimes = Time.CDate(beginTime)
+    iReth = Time.Hour(beginTimes)
+	iRetm = Time.Minute(beginTimes)
+	iRets = Time.Second(beginTimes)
+	beginTime_between = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //处理结束时间
+    endTimes = Time.CDate(endTime)
+    iReth = Time.Hour(endTimes)
+	iRetm = Time.Minute(endTimes)
+	iRets = Time.Second(endTimes)
+	endTime_between = Time.TimeSerial(iReth, iRetm, iRets)
+    //TracePrint($PrevResult)
+
+    //TracePrint Time.DateDiff("s", dTime, beginTime_between)
+    //TracePrint Time.DateDiff("s", dTime, endTime_between)
+
+	if Time.DateDiff("s", dTime, beginTime_between) <= 0 And Time.DateDiff("s", dTime, endTime_between) >= 0
+        flag = True
+	End If
+    Return flag
+End Function
+
+/*
+    功能点：判断两个时间是否相差n个Time单位（时分秒）
+    参数：
+        compareTime：比较的时间
+        comparedTime：被比较的时间
+        targetNumber：几个单位
+        unit：单位级别(h、n、s)
+    返回值：True/False
+*/
+/*
+comparedTime = "2023-03-29 15:59:47"
+compareTime = "2023-03-29 16:59:40"
+targetNumber = 3600
+unit = "s"
+difiTimeNUnit(compareTime,comparedTime,targetNumber,unit) 
+*/
+Function difiTimeNUnit(compareTime,comparedTime,targetNumber,unit) 
+    Dim flag = False
+    Dim tRet,iReth,iRetm,iRets,comparedTime_time,compareTime_time
+    Dim difiCountUnit
+
+    tRet = Time.CDate(compareTime)
+    iReth = Time.Hour(tRet)
+    iRetm = Time.Minute(tRet)
+    iRets = Time.Second(tRet)
+    compareTime_time = Time.TimeSerial(iReth,iRetm,iRets)
+    
+    tRet = Time.CDate(comparedTime)
+    iReth = Time.Hour(tRet)
+    iRetm = Time.Minute(tRet)
+    iRets = Time.Second(tRet)
+    comparedTime_time = Time.TimeSerial(iReth,iRetm,iRets)
+
+    difiCountUnit = Time.DateDiff(unit,compareTime_time,comparedTime_time)
+    difiCountUnit = Math.Abs(difiCountUnit)
+    TracePrint($PrevResult)
+    If difiCountUnit >= targetNumber
+        flag = True
+    End If
+    Return flag
+End Function
+
+/*
+    功能点：判断两个时间是否相差n个Data单位（年月日）
+    参数：
+        compareTime：比较的时间
+        comparedTime：被比较的时间
+        targetNumber：几个单位
+        unit：单位级别(yyyy、m、d)
+    返回值：True/False
+*/
+/*
+comparedTime = "2023/3/20 00:00:00"
+compareTime = "2023/3/29 19:00:00"
+targetNumber = 5
+unit = "d"
+ret = difiDataNUnit(compareTime,comparedTime,targetNumber,unit)
+TracePrint($PrevResult)
+*/
+Function difiDataNUnit(compareTime,comparedTime,targetNumber,unit) 
+    Dim flag = False
+    Dim tRet,iReth,iRetm,iRets,comparedTime_time,compareTime_time
+    Dim difiCountUnit
+
+    tRet = Time.CDate(compareTime)
+    iReth = Time.Year(tRet)
+    iRetm = Time.Month(tRet)
+    iRets = Time.Day(tRet)
+    compareTime_time = Time.DateSerial(iReth,iRetm,iRets)
+    
+    tRet = Time.CDate(comparedTime)
+    iReth = Time.Year(tRet)
+    iRetm = Time.Month(tRet)
+    iRets = Time.Day(tRet)
+    comparedTime_time = Time.DateSerial(iReth,iRetm,iRets)
+
+    difiCountUnit = Time.DateDiff(unit,compareTime_time,comparedTime_time)
+    //difiCountUnit = Math.Abs(difiCountUnit)
+    TracePrint($PrevResult)
+    If difiCountUnit >= targetNumber
+        flag = True
+    End If
+    Return flag
+End Function
+
+/**
+    功能：改变时间
+
+    referTime：参考时间。字符串格式，需要是"yyyy.mm.dd.hh.mm.ss"，不能缺少时分秒或年月日
+    timeFormat：参考时间的时间格式。默认为："yyyy.mm.dd.hh.mm.ss"
+    unit：改变时间的单位。可选项有  yyyy:年份;q:季度;m:月份;ww:星期;d:天数;h:小时;n:分钟;s:秒
+    number:调整时间增加多少个时间单位。减少用负号表示
+    returnFormat：得出新时间返回的时间格式
+*/
+/*
+referTime = "2023/3/20 00:00:00"
+timeFormat = "yyyy.mm.dd.hh.mm.ss"
+unit = "d"
+number = 0
+returnFormat = "yyyy年mm月"
+ret = changeTime(referTime,timeFormat,unit,number,returnFormat) 
+TracePrint($PrevResult)
+*/
+Function changeTime(referTime,timeFormat,unit,number,returnFormat) 
+    /*
+        （1）检查 参考时间：referTime 是否为空
+            是则设置为当前时间
+            否则检查字符串能否转换时间
+        （2）检查 返回的时间格式：returnFormat 是否为空
+            是则设置默认为"yyyy.mm.dd.hh.mm.ss"
+        （3）改变时间
+    */
+    //检查 参考时间：referTime 是否为空
+    Dim iRet,bRet,ret,tRet
+    If referTime = "" 
+        referTime = Time.Format(time.Now(), "yyyy-mm-dd hh:mm:ss")
+        timeFormat = "yyyy-mm-dd hh:mm:ss"
+    Else 
+        bRet = Time.IsDate(referTime, timeFormat)
+        If Not bRet 
+            Log.Error(referTime & "不能转换为时间格式：" & timeFormat)
+            Return 
+        End If
+    End If
+
+    //检查 返回的时间格式：returnFormat 是否为空
+    If returnFormat = "" 
+        returnFormat = "yyyy-mm-dd hh:mm:ss"
+    End If
+
+    //改变时间
+    tRet = time.CDate(referTime, timeFormat)
+    iRet = Time.DateAdd(unit, number, tRet)
+    ret = Time.Format(iRet, returnFormat)
+    Return ret
+End Function
